@@ -34,6 +34,7 @@ tests/
 # ===== 其他 =====
 *.bak
 *.backup
+.cursorrules
 prompt.md
 DEVELOPMENT.md
 TESTING.md
