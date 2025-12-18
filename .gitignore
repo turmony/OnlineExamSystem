@@ -1,0 +1,38 @@
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Backend (Java/Maven) =====
+target/
+*.class
+*.jar
+*.war
+*.log
+*.tmp
+
+# ===== Frontend (Node.js/Vue) =====
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.local
+
+# ===== 配置文件（敏感信息）=====
+application-prod.yml
+.env
+
+# ===== 测试 =====
+tests/
+
+# ===== 其他 =====
+*.bak
+*.backup
+prompt.md
+

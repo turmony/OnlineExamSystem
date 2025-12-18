@@ -1,0 +1,383 @@
+# Online Exam System - Cursor Rules
+# 在线考试系统开发规范
+
+## 项目概述
+这是一个基于 Spring Boot + Vue3 的在线考试系统，**后端为主**，放在简历中提升竞争力。
+
+## 技术栈
+- 前端: Vue3 + Arco Design Vue + Vite (简化版，不强制TypeScript)
+- 后端: Spring Boot 3.x + Spring Security + JWT + MyBatis-Plus
+- 数据库: MySQL 8.0 + Redis
+- 部署: Docker + Docker Compose + Nginx
+
+## 代码规范
+
+### 通用规范
+- 所有代码文件使用 UTF-8 编码
+- 缩进使用 4 个空格，禁止使用 Tab
+- 每个文件末尾保留一个空行
+- 删除多余的空行和空格
+- 代码注释使用中文，变量命名使用英文
+
+### 前端规范 (Vue3 简化版)
+
+#### 文件命名
+- 组件文件: PascalCase，如 `UserLogin.vue`
+- 工具文件: camelCase，如 `request.js`
+
+#### Vue3 组件规范
+- 使用 `<script setup>` 语法（可不用TypeScript）
+- 组件顺序: template -> script -> style
+- 使用 Composition API
+- 尽量使用 Arco Design 现成组件，减少自定义样式
+
+```vue
+<template>
+  <div class="page-container">
+    <!-- 直接使用 Arco Design 组件 -->
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { Message } from '@arco-design/web-vue'
+
+// 响应式数据
+const loading = ref(false)
+const data = ref([])
+
+// 方法
+const fetchData = async () => {
+  loading.value = true
+  try {
+    // API调用
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchData()
+})
+</script>
+
+<style scoped>
+.page-container {
+  padding: 20px;
+}
+</style>
+```
+
+#### API 请求规范
+- 所有 API 请求统一放在 `src/api` 目录
+- 使用 axios 实例，统一处理请求/响应拦截
+
+```javascript
+// api/user.js
+import request from '@/utils/request'
+
+export const login = (data) => {
+  return request.post('/auth/login', data)
+}
+
+export const getUserList = (params) => {
+  return request.get('/user/page', { params })
+}
+```
+
+#### 状态管理
+- 简单数据用组件内 ref/reactive
+- 用户登录状态用 localStorage + 简单的 store
+
+### 后端规范 (Spring Boot)
+
+#### 包结构
+```
+com.exam
+├── config/          # 配置类
+├── controller/      # 控制器层
+├── service/         # 服务层
+│   └── impl/        # 服务实现
+├── mapper/          # 数据访问层
+├── entity/          # 实体类
+├── dto/             # 数据传输对象
+├── vo/              # 视图对象
+├── common/          # 公共类
+│   ├── result/      # 统一返回结果
+│   └── constant/    # 常量定义
+├── exception/       # 异常处理
+├── security/        # 安全相关
+├── utils/           # 工具类
+└── aspect/          # 切面
+```
+
+#### 命名规范
+- 类名: PascalCase，如 `UserController`
+- 方法名: camelCase，如 `getUserById`
+- 常量: UPPER_SNAKE_CASE，如 `MAX_PAGE_SIZE`
+- 数据库字段: snake_case，如 `create_time`
+
+#### Controller 规范
+- 使用 `@RestController` 注解
+- 路径使用 kebab-case，如 `/api/user-info`
+- 统一使用 `Result<T>` 返回结果
+- 使用 `@Validated` 进行参数校验
+
+```java
+@RestController
+@RequestMapping("/api/user")
+@RequiredArgsConstructor
+@Tag(name = "用户管理")
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/{id}")
+    @Operation(summary = "根据ID获取用户")
+    public Result<UserVO> getById(@PathVariable Long id) {
+        return Result.success(userService.getById(id));
+    }
+
+    @PostMapping
+    @Operation(summary = "创建用户")
+    public Result<Void> create(@RequestBody @Validated UserDTO dto) {
+        userService.create(dto);
+        return Result.success();
+    }
+}
+```
+
+#### Service 规范
+- 接口定义在 `service` 包下
+- 实现类放在 `service/impl` 包下
+- 使用 `@Transactional` 管理事务
+
+```java
+public interface UserService {
+    UserVO getById(Long id);
+    void create(UserDTO dto);
+}
+
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+    
+    private final UserMapper userMapper;
+    
+    @Override
+    public UserVO getById(Long id) {
+        User user = userMapper.selectById(id);
+        return BeanUtil.copyProperties(user, UserVO.class);
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void create(UserDTO dto) {
+        User user = BeanUtil.copyProperties(dto, User.class);
+        userMapper.insert(user);
+    }
+}
+```
+
+#### Entity 规范
+- 使用 Lombok 注解简化代码
+- 使用 MyBatis-Plus 注解映射表
+
+```java
+@Data
+@TableName("sys_user")
+public class User {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    
+    private String username;
+    
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+    
+    @TableLogic
+    private Integer deleted;
+}
+```
+
+#### 异常处理规范
+- 自定义业务异常 `BusinessException`
+- 使用全局异常处理器 `@RestControllerAdvice`
+- 错误码使用枚举定义
+
+### 数据库规范
+
+#### 表设计规范
+- 表名使用 snake_case，加前缀区分模块
+  - 系统模块: `sys_`
+  - 考试模块: `exam_`
+- 主键统一使用 `id`，类型 BIGINT
+- 必备字段: `create_time`, `update_time`, `deleted`
+- 字段名使用 snake_case
+
+#### SQL 规范
+- 关键字使用大写
+- 禁止使用 `SELECT *`
+- 复杂查询使用 XML 文件
+
+### API 设计规范
+
+#### RESTful 规范
+- GET: 查询
+- POST: 创建
+- PUT: 更新
+- DELETE: 删除
+
+#### 响应格式
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {}
+}
+```
+
+#### 分页响应格式
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [],
+    "total": 100,
+    "current": 1,
+    "size": 10
+  }
+}
+```
+
+### 测试规范
+
+#### 后端测试（重点）
+- 单元测试覆盖 Service 层
+- 使用 `@SpringBootTest` 进行集成测试
+- Mock 外部依赖
+- 接口测试使用 Apifox/Postman
+
+#### 前端测试（简化）
+- 主要通过浏览器手动测试
+- 重点测试核心流程：登录、考试、提交
+
+### Git 规范
+
+#### 分支管理
+- main: 主分支，用于生产
+- develop: 开发分支
+- feature/*: 功能分支
+- bugfix/*: 修复分支
+
+#### Commit Message 格式
+```
+<type>(<scope>): <subject>
+
+类型:
+- feat: 新功能
+- fix: 修复Bug
+- docs: 文档更新
+- style: 代码格式
+- refactor: 重构
+- test: 测试
+- chore: 构建/工具
+```
+
+### 安全规范
+
+#### 禁止硬编码
+- **禁止在代码中硬编码任何敏感信息**
+- 以下内容必须从配置文件读取：
+  - JWT 密钥 (jwt.secret)
+  - 数据库连接信息 (spring.datasource.*)
+  - Redis 连接信息 (spring.redis.*)
+  - 第三方服务密钥
+  - 加密盐值
+- 配置文件示例：
+
+```yaml
+# application.yml - 敏感配置使用环境变量
+jwt:
+  secret: ${JWT_SECRET:default-dev-secret-key}
+  expiration: ${JWT_EXPIRATION:86400}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/exam}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+```
+
+- 读取配置示例：
+
+```java
+@Value("${jwt.secret}")
+private String jwtSecret;
+
+// 或使用 @ConfigurationProperties
+@ConfigurationProperties(prefix = "jwt")
+public class JwtProperties {
+    private String secret;
+    private Long expiration;
+}
+```
+
+#### 认证授权
+- 使用 JWT 进行身份认证
+- Token 存储在 localStorage
+- 敏感接口需要权限校验
+
+#### 防作弊功能
+- 切屏检测: 监听 visibilitychange 事件
+- 复制粘贴禁用: 禁用右键和快捷键
+- 全屏监控: 强制全屏考试
+- 作弊日志: 记录异常行为
+
+### 注释规范
+
+#### Java 注释
+```java
+/**
+ * 用户服务
+ *
+ * @author YourName
+ * @since 2024-01-01
+ */
+public interface UserService {
+    
+    /**
+     * 根据ID获取用户
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     */
+    UserVO getById(Long id);
+}
+```
+
+#### TypeScript 注释
+```typescript
+/**
+ * 格式化日期
+ * @param date 日期对象
+ * @param format 格式化模板
+ * @returns 格式化后的字符串
+ */
+export const formatDate = (date: Date, format: string): string => {
+  // 实现
+}
+```
+
+## 开发流程
+1. 阅读 DEVELOPMENT.md 了解开发步骤
+2. 按照开发步骤顺序进行开发
+3. 每完成一个步骤，执行对应的测试用例
+4. 测试通过后再进行下一步开发
+5. 提交代码前确保所有测试通过
+
