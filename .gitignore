@@ -35,4 +35,5 @@ tests/
 *.bak
 *.backup
 prompt.md
-
+DEVELOPMENT.md
+TESTING.md
